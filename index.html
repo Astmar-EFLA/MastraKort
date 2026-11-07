@@ -172,12 +172,12 @@
 <dialog id="dlg-set">
   <h2>Stillingar</h2>
   <div class="hint" id="set-src"></div>
-  <h3>Hnitaskrá</h3>
+  <h3>Mastraskrá (CSV eða GeoJSON)</h3>
   <div class="row" style="margin-top:6px">
     <button class="btn btn-ghost" id="set-upload" type="button">Velja CSV-skrá</button>
-    <button class="btn btn-ghost" id="set-default" type="button">Nota masts.csv</button>
+    <button class="btn btn-ghost" id="set-default" type="button">Nota sjálfgefna skrá</button>
   </div>
-  <input type="file" id="csv-input" accept=".csv,.txt,text/csv,text/plain" style="display:none">
+  <input type="file" id="csv-input" accept=".csv,.txt,.geojson,.json,text/csv,text/plain,application/json,application/geo+json" style="display:none">
   <label for="set-url">Sækja af vefslóð</label>
   <div class="row" style="margin-top:0">
     <input id="set-url" type="url" placeholder="https://raw.githubusercontent.com/…/masts.csv" style="flex:3">
@@ -190,7 +190,7 @@
     <option value="isn2016">ISN2016</option>
     <option value="wgs84">WGS84 (X = lengd, Y = breidd)</option>
   </select>
-  <div class="hint">Skráin þarf haus. Nafn mastursins er dálkur sem heitir t.d. Nafn, Heiti, Name eða Nr. (annars fyrsti dálkur). Hnit eru X/Y (eða Austur/Norður) eða Lat/Lon. Skilatákn: semíkomma, komma eða tab.</div>
+  <div class="hint">Skráin þarf haus. Nafn mastursins er dálkur sem heitir t.d. Nafn, Heiti, Name eða Nr. (annars fyrsti dálkur). Hnit eru X/Y (eða Austur/Norður) eða Lat/Lon. Skilatákn: semíkomma, komma eða tab. GeoJSON: Point-hlutir með nafn í properties (nafn/heiti/name); properties.lokid = true merkir mastur lokið.</div>
   <div class="row"><button class="btn" id="set-close" type="button">Loka</button></div>
 </dialog>
 
@@ -213,8 +213,9 @@
   <div id="mine-done" class="hint" style="margin:0 0 8px"></div>
   <div class="row" style="margin-top:0">
     <button class="btn btn-ghost" id="done-export" type="button">Sækja lista (CSV)</button>
-    <button class="btn btn-ghost" id="done-clear" type="button">Hreinsa allt</button>
+    <button class="btn btn-ghost" id="masts-geojson" type="button">Möstur með stöðu (GeoJSON)</button>
   </div>
+  <div class="row"><button class="btn btn-ghost" id="done-clear" type="button">Hreinsa allt „lokið“</button></div>
   <h3>Punktar</h3><div id="mine-wpts"></div>
   <h3>Slóðir</h3><div id="mine-tracks"></div>
   <div class="row">
@@ -247,12 +248,12 @@ var ISN2016='+proj=lcc +lat_1=64.25 +lat_2=65.75 +lat_0=65 +lon_0=-19 +x_0=27000
 
 /* ---------- CSV ---------- */
 function sniffDelimiter(text){
-  var first=text.replace(/^﻿/,'').split(/\r?\n/)[0]||'', best=';', n=-1;
+  var first=text.replace(/^\uFEFF/,'').split(/\r?\n/)[0]||'', best=';', n=-1;
   [';','\t',','].forEach(function(d){ var c=first.split(d).length-1; if(c>n){ n=c; best=d; } });
   return best;
 }
 function parseCsv(text){
-  text=text.replace(/^﻿/,'');
+  text=text.replace(/^\uFEFF/,'');
   var d=sniffDelimiter(text), rows=[], row=[], cell='', q=false, i, ch;
   for(i=0;i<text.length;i++){
     ch=text[i];
@@ -280,7 +281,38 @@ function findCol(header,names){
 }
 /* Mastursnúmer: tölustafir fremst í nafni ("12-FAJ" -> "12"), annars fyrstu stafir nafnsins */
 function mastNo(name){ var m=String(name).match(/^\s*(\d+)/); return m?m[1]:String(name).trim().slice(0,4); }
+/* GeoJSON (Point): nafn úr properties, valfrjálst lokid/lokid_timi; hnit í WGS84 (eða ISN ef gildin eru stór) */
+function buildFromGeoJson(text){
+  var gj=JSON.parse(text.replace(/^\uFEFF/,''));
+  var feats=gj.type==='FeatureCollection'?gj.features:(gj.type==='Feature'?[gj]:[]);
+  var nameKeys=['nafn','heiti','name','mastur','mastursnafn','nr.','nr','id','label'], doneKeys=['lokid','lokið','done'], timeKeys=['lokid_timi','lokið_tími','lokid_tími','done_time'];
+  var mode=lsGet(K.crs,'auto'), out=[], bad=0, used='WGS84', doneIn={};
+  feats.forEach(function(f,idx){
+    var g=f&&f.geometry; if(!g||g.type!=='Point'||!g.coordinates){ bad++; return; }
+    var a=Number(g.coordinates[0]), b=Number(g.coordinates[1]), lat,lon,x=null,y=null;
+    if(!isFinite(a)||!isFinite(b)){ bad++; return; }
+    if(Math.abs(a)<=180&&Math.abs(b)<=90){ lon=a; lat=b; used='WGS84'; }
+    else {
+      var m=mode==='auto'?(a>2000000?'isn2016':'isn93'):mode;
+      if(m==='wgs84'){ bad++; return; }
+      var ll=proj4(m==='isn2016'?ISN2016:ISN93,'EPSG:4326',[a,b]); lon=ll[0]; lat=ll[1]; x=a; y=b; used=m==='isn2016'?'ISN2016':'ISN93';
+    }
+    var p=f.properties||{}, keys=Object.keys(p), lc=function(k){ return k.toLowerCase(); };
+    var nk=null; nameKeys.some(function(n){ return keys.some(function(k){ if(lc(k)===n){ nk=k; return true; } return false; }); });
+    var dk=null; keys.forEach(function(k){ if(doneKeys.indexOf(lc(k))!==-1) dk=k; });
+    var tk=null; keys.forEach(function(k){ if(timeKeys.indexOf(lc(k))!==-1) tk=k; });
+    var name=(nk&&String(p[nk]==null?'':p[nk]).trim())||('Mastur '+(idx+1));
+    var props=[];
+    keys.forEach(function(k){ if(k===nk||k===dk||k===tk) return; var v=p[k]; if(v!=null && typeof v!=='object' && String(v).trim()!=='') props.push([k,String(v).trim()]); });
+    var mast={idx:idx,name:name,no:mastNo(name),key:name+'|'+lat.toFixed(5)+'|'+lon.toFixed(5),lat:lat,lon:lon,x:x,y:y,crs:used,props:props};
+    if(dk && (p[dk]===true || /^(já|ja|true|1|x|yes)$/i.test(String(p[dk]).trim()))){ var t=tk?Date.parse(p[tk]):NaN; doneIn[mast.key]=isFinite(t)?t:Date.now(); }
+    out.push(mast);
+  });
+  if(!out.length) throw new Error('Engir Point-hlutir með gild hnit fundust í GeoJSON');
+  return {masts:out,bad:bad,crs:used,doneIn:doneIn};
+}
 function buildMasts(text){
+  if(/^\s*\{/.test(text.replace(/^\uFEFF/,''))) return buildFromGeoJson(text);
   var rows=parseCsv(text);
   if(rows.length<2) throw new Error('Skráin er tóm eða vantar haus');
   var h=rows[0].map(function(s){ return String(s).trim(); });
@@ -321,6 +353,11 @@ var masts=[], srcLabel='';
 function applyCsvText(text,label,persistUpload){
   var res=buildMasts(text);
   masts=res.masts; srcLabel=label;
+  if(res.doneIn){                                           // GeoJSON með lokid: bæta við þeim sem eru merkt lokið í skránni
+    var dm=doneMap(), added=0;
+    Object.keys(res.doneIn).forEach(function(k){ if(!dm[k]){ dm[k]=res.doneIn[k]; added++; } });
+    if(added){ lsSetJson(K.done,dm); toast(added+' möstur merkt lokið úr skránni'); }
+  }
   if(persistUpload){ lsSet(K.csv,text); lsSet(K.csvName,label); }
   $('#hdr-sub').textContent=label+' · '+res.crs;
   $('#set-src').textContent='Núverandi skrá: '+label+' ('+masts.length+' möstur'+(res.bad?', '+res.bad+' raðir sleppt':'')+', hnitakerfi '+res.crs+')';
@@ -331,7 +368,10 @@ function fetchText(url){ return fetch(url,{cache:'no-cache'}).then(function(r){ 
 function loadDefault(){
   var q=new URLSearchParams(location.search).get('csv');
   var url=q||DEFAULT_CSV;
-  return fetchText(url).then(function(t){
+  return fetchText(url).catch(function(err){
+    if(q) throw err;
+    url='masts.geojson'; return fetchText(url).catch(function(){ throw err; });   // masts.csv vantar -> reyna masts.geojson
+  }).then(function(t){
     lsSet(K.cache,t);
     applyCsvText(t,url.split('/').pop(),false);
   }).catch(function(err){
@@ -669,8 +709,18 @@ $('#mine-geojson').addEventListener('click',function(){ var w=wpts(),t=tracks();
 $('#done-export').addEventListener('click',function(){
   var dm=doneMap(), rows=masts.map(function(m){ return [m.name,m.lat.toFixed(6),m.lon.toFixed(6),dm[m.key]?'Já':'',dm[m.key]?new Date(dm[m.key]).toISOString():'']; });
   if(!masts.length){ toast('Engin gögn'); return; }
-  var csv='﻿Nafn;Lat;Lon;Lokið;Tími\r\n'+rows.map(function(r){ return r.map(function(v){ v=String(v); return /[;"\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(';'); }).join('\r\n')+'\r\n';
+  var csv='\uFEFFNafn;Lat;Lon;Lokið;Tími\r\n'+rows.map(function(r){ return r.map(function(v){ v=String(v); return /[;"\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }).join(';'); }).join('\r\n')+'\r\n';
   download('Mastrakort_lokid_'+stamp()+'.csv',new Blob([csv],{type:'text/csv;charset=utf-8'}));
+});
+$('#masts-geojson').addEventListener('click',function(){
+  if(!masts.length){ toast('Engin gögn'); return; }
+  var dm=doneMap();
+  var fc={type:'FeatureCollection',features:masts.map(function(m){
+    var p={nafn:m.name}; m.props.forEach(function(q){ if(!(q[0] in p)) p[q[0]]=q[1]; });
+    p.lokid=!!dm[m.key]; p.lokid_timi=dm[m.key]?new Date(dm[m.key]).toISOString():null;
+    return {type:'Feature',properties:p,geometry:{type:'Point',coordinates:[Number(m.lon.toFixed(7)),Number(m.lat.toFixed(7))]}};
+  })};
+  download('masts_'+stamp()+'.geojson',new Blob([JSON.stringify(fc,null,1)],{type:'application/geo+json'}));
 });
 $('#done-clear').addEventListener('click',function(){
   if(!confirm('Afmarka öll möstur sem lokið?')) return;
@@ -689,7 +739,7 @@ $('#csv-input').addEventListener('change',function(e){
 });
 $('#set-default').addEventListener('click',function(){
   try{ localStorage.removeItem(K.csv); localStorage.removeItem(K.csvName); }catch(e){}
-  $('#dlg-set').close(); loadDefault().then(function(){ toast('Nota '+DEFAULT_CSV); });
+  $('#dlg-set').close(); loadDefault().then(function(){ toast('Sjálfgefin skrá í notkun'); });
 });
 $('#set-url-go').addEventListener('click',function(){
   var u=($('#set-url').value||'').trim(); if(!u){ toast('Sláðu inn vefslóð'); return; }

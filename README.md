@@ -15,6 +15,7 @@ Einfaldur vefskoðari fyrir möstur (afleggjari af Jarðkönnun-appinu, án Shar
 - Eða veldu CSV-skrá / vefslóð í ⚙ stillingum (vistast í tækinu). Hægt er að nota `?csv=<slóð>` í vefslóðinni til að benda á aðra skrá, t.d. `…/index.html?csv=https://raw.githubusercontent.com/<notandi>/<repo>/main/masts.csv`.
 - Haus er nauðsynlegur. Nafn: dálkur sem heitir `Nafn`, `Heiti`, `Name`, `Nr.` … (annars fyrsti dálkur). Hnit: `X`/`Y` (eða `Austur`/`Norður`) eða `Lat`/`Lon`.
 - Hnitakerfi greinist sjálfkrafa: ISN93 (X≈300–700 þús.), ISN2016 (X > 2 milljónir) eða WGS84. Hægt að þvinga í stillingum.
+- **GeoJSON** er líka stutt sem mastraskrá (`masts.geojson` er reynd ef `masts.csv` vantar, eða veldu skrána í stillingum): Point-hlutir með nafn í `properties.nafn` / `heiti` / `name`. `properties.lokid = true` (og valfrjálst `lokid_timi`) merkir mastur lokið við innlestur. „Möstur með stöðu (GeoJSON)“ í ⤓ Mín gögn flytur mastrana út með `lokid` svo hægt sé að setja skrána aftur á GitHub.
 - Skilatákn: `;`, `,` eða tab. Aðrir dálkar birtast í sprettglugga mastursins.
 
 Sýnishorn: sjá `masts.csv`.
