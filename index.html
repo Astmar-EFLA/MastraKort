@@ -112,19 +112,16 @@
   .pp-btns .alt{background:var(--white);color:var(--black)!important}
   .pp-btns .doneb{width:100%;font-size:14px;padding:11px}
 
-  /* Möstur: hringur með númeri; hvítur = óloknað, svartur = lokið, rauður hringur = valið */
-  .mk i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 5px;
-        border:2.5px solid var(--black);background:var(--white);color:var(--black);border-radius:14px;font:700 12px/1 var(--sans);font-style:normal;letter-spacing:-.02em;
-        box-shadow:0 0 0 1.5px var(--white)}
-  .mk.done i{background:var(--black);color:var(--white)}
-  .mk.sel i{border-color:var(--red);box-shadow:0 0 0 3px rgba(250,0,0,.35),0 0 0 1.5px var(--white)}
-  #map.z-low .mk i{min-width:11px;height:11px;padding:0;border-width:2.5px}
-  #map.z-low .mk i b{display:none}
-  .mk b{font-weight:700}
+  /* Möstur: litaður punktur með heiti/númeri við hliðina. Rauður = óloknað, svartur = lokið, stærri með rauðum hring = valið */
+  .mk i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:block;width:16px;height:16px;border-radius:50%;
+        background:var(--red);border:2.5px solid var(--white);box-shadow:0 0 0 1.5px var(--black)}
+  .mk.done i{background:var(--black)}
+  .mk.sel i{width:22px;height:22px;box-shadow:0 0 0 3px var(--red),0 0 0 4.5px var(--white)}
+  #map.z-low .mk i{width:11px;height:11px;border-width:2px}
   .wp i{position:absolute;left:-7px;top:-7px;width:14px;height:14px;background:var(--grey);border:2px solid var(--white);outline:1.5px solid var(--black);display:block}
   .pt-label{background:var(--white);color:var(--black);border:1.5px solid var(--black);border-radius:2px;box-shadow:none;font:700 11px/1.2 var(--sans);padding:1px 5px}
   .pt-label:before{display:none}
-  #map:not(.z-high) .mast-label{display:none}
+  #map.z-low .mast-label{display:none}
   .ctl-active,.ctl-active:hover{background:var(--red)!important;color:var(--white)!important}
 </style>
 </head>
@@ -472,7 +469,7 @@ function coText(m){
 }
 function iconFor(m){
   var cls='mk'+(isDone(m)?' done':'')+(selectedIdx===m.idx?' sel':'');
-  return L.divIcon({className:cls,html:'<i><b>'+esc(m.no)+'</b></i>',iconSize:[28,28],iconAnchor:[14,14]});
+  return L.divIcon({className:cls,html:'<i></i>',iconSize:[36,36],iconAnchor:[18,18]});
 }
 function refreshMarker(m){ var mk=mastMarkers[m.idx]; if(mk) mk.setIcon(iconFor(m)); }
 function popupHtml(m){
@@ -494,7 +491,7 @@ function renderMasts(fit){
     var mk=L.marker([m.lat,m.lon],{pane:'mastPane',icon:iconFor(m),title:m.name,keyboard:true,riseOnHover:true});
     mk.bindPopup(popupHtml(m),{autoPanPadding:[30,30]});
     mk.on('popupopen',function(){ var old=selectedIdx; selectedIdx=m.idx; refreshMarker(m); var o=masts.filter(function(x){ return x.idx===old; })[0]; if(o&&o!==m) refreshMarker(o); });
-    if(m.name!==m.no) mk.bindTooltip(esc(m.name),{permanent:true,direction:'bottom',offset:[0,12],className:'pt-label mast-label'});
+    mk.bindTooltip(esc(m.name),{permanent:true,direction:'right',offset:[10,0],className:'pt-label mast-label'});
     mk.addTo(markerLayer); mastMarkers[m.idx]=mk; ll.push([m.lat,m.lon]);
   });
   if(fit && ll.length) map.fitBounds(ll,{padding:[40,40],maxZoom:15});
