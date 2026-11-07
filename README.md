@@ -1,0 +1,20 @@
+# Mastraskoðari
+
+Einfaldur vefskoðari fyrir möstur (afleggjari af Jarðkönnun-appinu, án SharePoint). Opinn úr síma eða tölvu, engin uppsetning.
+
+**Hvað hann gerir**
+- Les hnitaskrá (CSV) með mastranöfnum og sýnir möstrin á korti (OSM / loftmynd) og í leitarhæfum lista.
+- Smelltu á mastur til að zooma að því. **🚗 Leið** opnar leiðsögn beint á mastrið í Google Maps; í sprettglugganum er líka „Sýna í Google Maps“ og „Afrita hnit“.
+- ◎ zoomar á staðsetningu símans, ⛶ fullur skjár.
+- 📍 tekur punkt á staðsetningu þinni (heiti + athugasemd), ⏺ tekur upp GPS-slóð. Allt vistast í tækinu (virkar án nets) og fæst sótt sem GPX eða GeoJSON í 📂 „Mín gögn“.
+
+**Hnitaskráin**
+- `masts.csv` í sömu möppu er sótt sjálfkrafa við opnun (uppfærðu hana á GitHub og allir sjá nýju möstrin).
+- Eða veldu CSV-skrá / vefslóð í ⚙ stillingum (vistast í tækinu). Hægt er að nota `?csv=<slóð>` í vefslóðinni til að benda á aðra skrá, t.d. `…/index.html?csv=https://raw.githubusercontent.com/<notandi>/<repo>/main/masts.csv`.
+- Haus er nauðsynlegur. Nafn: dálkur sem heitir `Nafn`, `Heiti`, `Name`, `Nr.` … (annars fyrsti dálkur). Hnit: `X`/`Y` (eða `Austur`/`Norður`) eða `Lat`/`Lon`.
+- Hnitakerfi greinist sjálfkrafa: ISN93 (X≈300–700 þús.), ISN2016 (X > 2 milljónir) eða WGS84. Hægt að þvinga í stillingum.
+- Skilatákn: `;`, `,` eða tab. Aðrir dálkar birtast í sprettglugga mastursins.
+
+Sýnishorn: sjá `masts.csv`.
+
+**Birting á GitHub Pages:** Settings → Pages → Deploy from branch → `main` / root.
